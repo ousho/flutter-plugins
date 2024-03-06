@@ -13,15 +13,41 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
-import androidx.health.connect.client.records.MealType.MEAL_TYPE_BREAKFAST
-import androidx.health.connect.client.records.MealType.MEAL_TYPE_DINNER
-import androidx.health.connect.client.records.MealType.MEAL_TYPE_LUNCH
-import androidx.health.connect.client.records.MealType.MEAL_TYPE_SNACK
 import androidx.health.connect.client.records.MealType.MEAL_TYPE_UNKNOWN
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.*
+import cachet.plugins.health.HCType.ACTIVE_ENERGY_BURNED
+import cachet.plugins.health.HCType.BASAL_ENERGY_BURNED
+import cachet.plugins.health.HCType.BLOOD_GLUCOSE
+import cachet.plugins.health.HCType.BLOOD_OXYGEN
+import cachet.plugins.health.HCType.BLOOD_PRESSURE_DIASTOLIC
+import cachet.plugins.health.HCType.BLOOD_PRESSURE_SYSTOLIC
+import cachet.plugins.health.HCType.BODY_FAT_PERCENTAGE
+import cachet.plugins.health.HCType.BODY_TEMPERATURE
+import cachet.plugins.health.HCType.DISTANCE_DELTA
+import cachet.plugins.health.HCType.FLIGHTS_CLIMBED
+import cachet.plugins.health.HCType.HEART_RATE
+import cachet.plugins.health.HCType.HEIGHT
+import cachet.plugins.health.HCType.MapMealTypeToTypeHC
+import cachet.plugins.health.HCType.MapSleepStageToType
+import cachet.plugins.health.HCType.MapToHCType
+import cachet.plugins.health.HCType.MapTypeToMealTypeHC
+import cachet.plugins.health.HCType.NUTRITION
+import cachet.plugins.health.HCType.RESPIRATORY_RATE
+import cachet.plugins.health.HCType.RESTING_HEART_RATE
+import cachet.plugins.health.HCType.SLEEP_ASLEEP
+import cachet.plugins.health.HCType.SLEEP_AWAKE
+import cachet.plugins.health.HCType.SLEEP_DEEP
+import cachet.plugins.health.HCType.SLEEP_LIGHT
+import cachet.plugins.health.HCType.SLEEP_OUT_OF_BED
+import cachet.plugins.health.HCType.SLEEP_REM
+import cachet.plugins.health.HCType.SLEEP_SESSION
+import cachet.plugins.health.HCType.STEPS
+import cachet.plugins.health.HCType.WATER
+import cachet.plugins.health.HCType.WEIGHT
+import cachet.plugins.health.HCType.WORKOUT
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -36,7 +62,6 @@ import java.time.*
 import java.time.temporal.ChronoUnit
 import java.util.*
 import java.util.concurrent.*
-
 
 const val GOOGLE_FIT_PERMISSIONS_REQUEST_CODE = 1111
 const val HEALTH_CONNECT_RESULT_CODE = 16969
@@ -58,164 +83,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
     private var context: Context? = null
     private var threadPoolExecutor: ExecutorService? = null
     private var useHealthConnectIfAvailable: Boolean = false
-    private var healthConnectRequestPermissionsLauncher:  ActivityResultLauncher<Set<String>>? = null
+    private var healthConnectRequestPermissionsLauncher: ActivityResultLauncher<Set<String>>? = null
     private lateinit var healthConnectClient: HealthConnectClient
     private lateinit var scope: CoroutineScope
-
-    private var BODY_FAT_PERCENTAGE = "BODY_FAT_PERCENTAGE"
-    private var HEIGHT = "HEIGHT"
-    private var WEIGHT = "WEIGHT"
-    private var STEPS = "STEPS"
-    private var AGGREGATE_STEP_COUNT = "AGGREGATE_STEP_COUNT"
-    private var ACTIVE_ENERGY_BURNED = "ACTIVE_ENERGY_BURNED"
-    private var HEART_RATE = "HEART_RATE"
-    private var BODY_TEMPERATURE = "BODY_TEMPERATURE"
-    private var BLOOD_PRESSURE_SYSTOLIC = "BLOOD_PRESSURE_SYSTOLIC"
-    private var BLOOD_PRESSURE_DIASTOLIC = "BLOOD_PRESSURE_DIASTOLIC"
-    private var BLOOD_OXYGEN = "BLOOD_OXYGEN"
-    private var BLOOD_GLUCOSE = "BLOOD_GLUCOSE"
-    private var MOVE_MINUTES = "MOVE_MINUTES"
-    private var DISTANCE_DELTA = "DISTANCE_DELTA"
-    private var WATER = "WATER"
-    private var RESTING_HEART_RATE = "RESTING_HEART_RATE"
-    private var BASAL_ENERGY_BURNED = "BASAL_ENERGY_BURNED"
-    private var FLIGHTS_CLIMBED = "FLIGHTS_CLIMBED"
-    private var RESPIRATORY_RATE = "RESPIRATORY_RATE"
-
-    // TODO support unknown?
-    private var SLEEP_ASLEEP = "SLEEP_ASLEEP"
-    private var SLEEP_AWAKE = "SLEEP_AWAKE"
-    private var SLEEP_IN_BED = "SLEEP_IN_BED"
-    private var SLEEP_SESSION = "SLEEP_SESSION"
-    private var SLEEP_LIGHT = "SLEEP_LIGHT"
-    private var SLEEP_DEEP = "SLEEP_DEEP"
-    private var SLEEP_REM = "SLEEP_REM"
-    private var SLEEP_OUT_OF_BED = "SLEEP_OUT_OF_BED"
-    private var WORKOUT = "WORKOUT"
-    private var NUTRITION = "NUTRITION"
-    private var BREAKFAST = "BREAKFAST"
-    private var LUNCH = "LUNCH"
-    private var DINNER = "DINNER"
-    private var SNACK = "SNACK"
-    private var MEAL_UNKNOWN = "UNKNOWN"
-
-
-    // TODO: Update with new workout types when Health Connect becomes the standard.
-    private val workoutTypeMapHealthConnect = mapOf(
-        // "AEROBICS" to ExerciseSessionRecord.EXERCISE_TYPE_AEROBICS,
-        "AMERICAN_FOOTBALL" to ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN,
-        // "ARCHERY" to ExerciseSessionRecord.EXERCISE_TYPE_ARCHERY,
-        "AUSTRALIAN_FOOTBALL" to ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AUSTRALIAN,
-        "BADMINTON" to ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON,
-        "BASEBALL" to ExerciseSessionRecord.EXERCISE_TYPE_BASEBALL,
-        "BASKETBALL" to ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL,
-        // "BIATHLON" to ExerciseSessionRecord.EXERCISE_TYPE_BIATHLON,
-        "BIKING" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
-        // "BIKING_HAND" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_HAND,
-        //"BIKING_MOUNTAIN" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_MOUNTAIN,
-        // "BIKING_ROAD" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_ROAD,
-        // "BIKING_SPINNING" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_SPINNING,
-        // "BIKING_STATIONARY" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY,
-        // "BIKING_UTILITY" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_UTILITY,
-        "BOXING" to ExerciseSessionRecord.EXERCISE_TYPE_BOXING,
-        "CALISTHENICS" to ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS,
-        // "CIRCUIT_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_CIRCUIT_TRAINING,
-        "CRICKET" to ExerciseSessionRecord.EXERCISE_TYPE_CRICKET,
-        // "CROSS_COUNTRY_SKIING" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING_CROSS_COUNTRY,
-        // "CROSS_FIT" to ExerciseSessionRecord.EXERCISE_TYPE_CROSSFIT,
-        // "CURLING" to ExerciseSessionRecord.EXERCISE_TYPE_CURLING,
-        "DANCING" to ExerciseSessionRecord.EXERCISE_TYPE_DANCING,
-        // "DIVING" to ExerciseSessionRecord.EXERCISE_TYPE_DIVING,
-        // "DOWNHILL_SKIING" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING_DOWNHILL,
-        // "ELEVATOR" to ExerciseSessionRecord.EXERCISE_TYPE_ELEVATOR,
-        "ELLIPTICAL" to ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL,
-        // "ERGOMETER" to ExerciseSessionRecord.EXERCISE_TYPE_ERGOMETER,
-        // "ESCALATOR" to ExerciseSessionRecord.EXERCISE_TYPE_ESCALATOR,
-        "FENCING" to ExerciseSessionRecord.EXERCISE_TYPE_FENCING,
-        "FRISBEE_DISC" to ExerciseSessionRecord.EXERCISE_TYPE_FRISBEE_DISC,
-        // "GARDENING" to ExerciseSessionRecord.EXERCISE_TYPE_GARDENING,
-        "GOLF" to ExerciseSessionRecord.EXERCISE_TYPE_GOLF,
-        "GUIDED_BREATHING" to ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING,
-        "GYMNASTICS" to ExerciseSessionRecord.EXERCISE_TYPE_GYMNASTICS,
-        "HANDBALL" to ExerciseSessionRecord.EXERCISE_TYPE_HANDBALL,
-        "HIGH_INTENSITY_INTERVAL_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING,
-        "HIKING" to ExerciseSessionRecord.EXERCISE_TYPE_HIKING,
-        // "HOCKEY" to ExerciseSessionRecord.EXERCISE_TYPE_HOCKEY,
-        // "HORSEBACK_RIDING" to ExerciseSessionRecord.EXERCISE_TYPE_HORSEBACK_RIDING,
-        // "HOUSEWORK" to ExerciseSessionRecord.EXERCISE_TYPE_HOUSEWORK,
-        // "IN_VEHICLE" to ExerciseSessionRecord.EXERCISE_TYPE_IN_VEHICLE,
-        "ICE_SKATING" to ExerciseSessionRecord.EXERCISE_TYPE_ICE_SKATING,
-        // "INTERVAL_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_INTERVAL_TRAINING,
-        // "JUMP_ROPE" to ExerciseSessionRecord.EXERCISE_TYPE_JUMP_ROPE,
-        // "KAYAKING" to ExerciseSessionRecord.EXERCISE_TYPE_KAYAKING,
-        // "KETTLEBELL_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_KETTLEBELL_TRAINING,
-        // "KICK_SCOOTER" to ExerciseSessionRecord.EXERCISE_TYPE_KICK_SCOOTER,
-        // "KICKBOXING" to ExerciseSessionRecord.EXERCISE_TYPE_KICKBOXING,
-        // "KITE_SURFING" to ExerciseSessionRecord.EXERCISE_TYPE_KITESURFING,
-        "MARTIAL_ARTS" to ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS,
-        // "MEDITATION" to ExerciseSessionRecord.EXERCISE_TYPE_MEDITATION,
-        // "MIXED_MARTIAL_ARTS" to ExerciseSessionRecord.EXERCISE_TYPE_MIXED_MARTIAL_ARTS,
-        // "P90X" to ExerciseSessionRecord.EXERCISE_TYPE_P90X,
-        "PARAGLIDING" to ExerciseSessionRecord.EXERCISE_TYPE_PARAGLIDING,
-        "PILATES" to ExerciseSessionRecord.EXERCISE_TYPE_PILATES,
-        // "POLO" to ExerciseSessionRecord.EXERCISE_TYPE_POLO,
-        "RACQUETBALL" to ExerciseSessionRecord.EXERCISE_TYPE_RACQUETBALL,
-        "ROCK_CLIMBING" to ExerciseSessionRecord.EXERCISE_TYPE_ROCK_CLIMBING,
-        "ROWING" to ExerciseSessionRecord.EXERCISE_TYPE_ROWING,
-        "ROWING_MACHINE" to ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE,
-        "RUGBY" to ExerciseSessionRecord.EXERCISE_TYPE_RUGBY,
-        // "RUNNING_JOGGING" to ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_JOGGING,
-        // "RUNNING_SAND" to ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_SAND,
-        "RUNNING_TREADMILL" to ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL,
-        "RUNNING" to ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
-        "SAILING" to ExerciseSessionRecord.EXERCISE_TYPE_SAILING,
-        "SCUBA_DIVING" to ExerciseSessionRecord.EXERCISE_TYPE_SCUBA_DIVING,
-        // "SKATING_CROSS" to ExerciseSessionRecord.EXERCISE_TYPE_SKATING_CROSS,
-        // "SKATING_INDOOR" to ExerciseSessionRecord.EXERCISE_TYPE_SKATING_INDOOR,
-        // "SKATING_INLINE" to ExerciseSessionRecord.EXERCISE_TYPE_SKATING_INLINE,
-        "SKATING" to ExerciseSessionRecord.EXERCISE_TYPE_SKATING,
-        "SKIING" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING,
-        // "SKIING_BACK_COUNTRY" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING_BACK_COUNTRY,
-        // "SKIING_KITE" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING_KITE,
-        // "SKIING_ROLLER" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING_ROLLER,
-        // "SLEDDING" to ExerciseSessionRecord.EXERCISE_TYPE_SLEDDING,
-        "SNOWBOARDING" to ExerciseSessionRecord.EXERCISE_TYPE_SNOWBOARDING,
-        // "SNOWMOBILE" to ExerciseSessionRecord.EXERCISE_TYPE_SNOWMOBILE,
-        "SNOWSHOEING" to ExerciseSessionRecord.EXERCISE_TYPE_SNOWSHOEING,
-        // "SOCCER" to ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_SOCCER,
-        "SOFTBALL" to ExerciseSessionRecord.EXERCISE_TYPE_SOFTBALL,
-        "SQUASH" to ExerciseSessionRecord.EXERCISE_TYPE_SQUASH,
-        "STAIR_CLIMBING_MACHINE" to ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE,
-        "STAIR_CLIMBING" to ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING,
-        // "STANDUP_PADDLEBOARDING" to ExerciseSessionRecord.EXERCISE_TYPE_STANDUP_PADDLEBOARDING,
-        // "STILL" to ExerciseSessionRecord.EXERCISE_TYPE_STILL,
-        "STRENGTH_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
-        "SURFING" to ExerciseSessionRecord.EXERCISE_TYPE_SURFING,
-        "SWIMMING_OPEN_WATER" to ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER,
-        "SWIMMING_POOL" to ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL,
-        // "SWIMMING" to ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING,
-        "TABLE_TENNIS" to ExerciseSessionRecord.EXERCISE_TYPE_TABLE_TENNIS,
-        // "TEAM_SPORTS" to ExerciseSessionRecord.EXERCISE_TYPE_TEAM_SPORTS,
-        "TENNIS" to ExerciseSessionRecord.EXERCISE_TYPE_TENNIS,
-        // "TILTING" to ExerciseSessionRecord.EXERCISE_TYPE_TILTING,
-        // "VOLLEYBALL_BEACH" to ExerciseSessionRecord.EXERCISE_TYPE_VOLLEYBALL_BEACH,
-        // "VOLLEYBALL_INDOOR" to ExerciseSessionRecord.EXERCISE_TYPE_VOLLEYBALL_INDOOR,
-        "VOLLEYBALL" to ExerciseSessionRecord.EXERCISE_TYPE_VOLLEYBALL,
-        // "WAKEBOARDING" to ExerciseSessionRecord.EXERCISE_TYPE_WAKEBOARDING,
-        // "WALKING_FITNESS" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING_FITNESS,
-        // "WALKING_PACED" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING_PACED,
-        // "WALKING_NORDIC" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING_NORDIC,
-        // "WALKING_STROLLER" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING_STROLLER,
-        // "WALKING_TREADMILL" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING_TREADMILL,
-        "WALKING" to ExerciseSessionRecord.EXERCISE_TYPE_WALKING,
-        "WATER_POLO" to ExerciseSessionRecord.EXERCISE_TYPE_WATER_POLO,
-        "WEIGHTLIFTING" to ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING,
-        "WHEELCHAIR" to ExerciseSessionRecord.EXERCISE_TYPE_WHEELCHAIR,
-        // "WINDSURFING" to ExerciseSessionRecord.EXERCISE_TYPE_WINDSURFING,
-        "YOGA" to ExerciseSessionRecord.EXERCISE_TYPE_YOGA,
-        // "ZUMBA" to ExerciseSessionRecord.EXERCISE_TYPE_ZUMBA,
-        // "OTHER" to ExerciseSessionRecord.EXERCISE_TYPE_OTHER,
-    )
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -287,26 +157,25 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
     }
 
 
-    private  fun onHealthConnectPermissionCallback(permissionGranted: Set<String>)
-    {
-        if(permissionGranted.isEmpty()) {
-            mResult?.success(false);
+    private fun onHealthConnectPermissionCallback(permissionGranted: Set<String>) {
+        if (permissionGranted.isEmpty()) {
+            mResult?.success(false)
             Log.i("FLUTTER_HEALTH", "Access Denied (to Health Connect)!")
 
-        }else {
-            mResult?.success(true);
+        } else {
+            mResult?.success(true)
             Log.i("FLUTTER_HEALTH", "Access Granted (to Health Connect)!")
         }
 
     }
-    
+
     private fun writeMealHC(call: MethodCall, result: Result) {
         val startTime = Instant.ofEpochMilli(call.argument<Long>("startTime")!!)
         val endTime = Instant.ofEpochMilli(call.argument<Long>("endTime")!!)
         val calories = call.argument<Double>("caloriesConsumed")
-        val carbs = call.argument<Double>("carbohydrates") as Double?
-        val protein = call.argument<Double>("protein") as Double?
-        val fat = call.argument<Double>("fatTotal") as Double?
+        val carbs = call.argument<Double>("carbohydrates")
+        val protein = call.argument<Double>("protein")
+        val fat = call.argument<Double>("fatTotal")
         val name = call.argument<String>("name")
         val mealType = call.argument<String>("mealType")!!
 
@@ -398,12 +267,16 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         activity = binding.activity
 
 
-        if ( healthConnectAvailable) {
-            val requestPermissionActivityContract = PermissionController.createRequestPermissionResultContract()
+        if (healthConnectAvailable) {
+            val requestPermissionActivityContract =
+                PermissionController.createRequestPermissionResultContract()
 
-            healthConnectRequestPermissionsLauncher =(activity as ComponentActivity).registerForActivityResult(requestPermissionActivityContract) { granted ->
-                onHealthConnectPermissionCallback(granted);
-            }
+            healthConnectRequestPermissionsLauncher =
+                (activity as ComponentActivity).registerForActivityResult(
+                    requestPermissionActivityContract
+                ) { granted ->
+                    onHealthConnectPermissionCallback(granted)
+                }
         }
 
     }
@@ -421,7 +294,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
             return
         }
         activity = null
-        healthConnectRequestPermissionsLauncher = null;
+        healthConnectRequestPermissionsLauncher = null
     }
 
     /**
@@ -447,7 +320,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
 
         var permList = mutableListOf<String>()
         for ((i, typeKey) in types.withIndex()) {
-            if(!MapToHCType.containsKey(typeKey)) {
+            if (!MapToHCType.containsKey(typeKey)) {
                 Log.w("FLUTTER_HEALTH::ERROR", "Datatype " + typeKey + " not found in HC")
                 result.success(false)
                 return
@@ -502,12 +375,12 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
 
         var permList = mutableListOf<String>()
         for ((i, typeKey) in types.withIndex()) {
-            if(!MapToHCType.containsKey(typeKey)) {
+            if (!MapToHCType.containsKey(typeKey)) {
                 Log.w("FLUTTER_HEALTH::ERROR", "Datatype " + typeKey + " not found in HC")
                 result.success(false)
                 return
             }
-            val access = permissions[i]!!
+            val access = permissions[i]
             val dataType = MapToHCType[typeKey]!!
             if (access == 0) {
                 permList.add(
@@ -542,15 +415,15 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                 }
             }
         }
-        
-        if(healthConnectRequestPermissionsLauncher == null) {
+
+        if (healthConnectRequestPermissionsLauncher == null) {
             result.success(false)
             Log.i("FLUTTER_HEALTH", "Permission launcher not found")
-            return;
+            return
         }
 
 
-        healthConnectRequestPermissionsLauncher!!.launch(permList.toSet());
+        healthConnectRequestPermissionsLauncher!!.launch(permList.toSet())
     }
 
     fun getHCData(call: MethodCall, result: Result) {
@@ -568,10 +441,10 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                     // Define the maximum amount of data that HealthConnect can return in a single request
                     timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
                 )
-                
+
                 var response = healthConnectClient.readRecords(request)
                 var pageToken = response.pageToken
-                
+
                 // Add the records from the initial response to the records list
                 records.addAll(response.records)
 
@@ -626,7 +499,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                             // mapOf(
                             mapOf<String, Any?>(
                                 "workoutActivityType" to (
-                                        workoutTypeMapHealthConnect.filterValues { it == record.exerciseType }.keys.firstOrNull()
+                                        WorkoutType.map.filterValues { it == record.exerciseType }.keys.firstOrNull()
                                             ?: "OTHER"
                                         ),
                                 "totalDistance" to if (totalDistance == 0.0) null else totalDistance,
@@ -641,15 +514,13 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                             ),
                         )
                     }
-                // Filter sleep stages for requested stage
-                }
-                else if (classType == SleepSessionRecord::class) {
+                    // Filter sleep stages for requested stage
+                } else if (classType == SleepSessionRecord::class) {
                     for (rec in response.records) {
                         if (rec is SleepSessionRecord) {
                             if (dataType == SLEEP_SESSION) {
                                 healthConnectData.addAll(convertRecord(rec, dataType))
-                            }
-                            else {
+                            } else {
                                 for (recStage in rec.stages) {
                                     if (dataType == MapSleepStageToType[recStage.stage]) {
                                         healthConnectData.addAll(
@@ -684,7 +555,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                 "source_id" to "",
                 "source_name" to sourceName,
             ),
-        );
+        )
     }
 
     // TODO: Find alternative to SOURCE_ID or make it nullable?
@@ -820,6 +691,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                     "source_name" to metadata.dataOrigin.packageName,
                 ),
             )
+
             is RestingHeartRateRecord -> return listOf(
                 mapOf<String, Any>(
                     "value" to record.beatsPerMinute,
@@ -970,48 +842,91 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                 startZoneOffset = null,
                 endZoneOffset = null,
             )
+
             SLEEP_ASLEEP -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_SLEEPING)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_SLEEPING
+                    )
+                ),
             )
+
             SLEEP_LIGHT -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_LIGHT)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_LIGHT
+                    )
+                ),
             )
+
             SLEEP_DEEP -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_DEEP)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_DEEP
+                    )
+                ),
             )
+
             SLEEP_REM -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_REM)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_REM
+                    )
+                ),
             )
+
             SLEEP_OUT_OF_BED -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_OUT_OF_BED)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_OUT_OF_BED
+                    )
+                ),
             )
+
             SLEEP_AWAKE -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
                 startZoneOffset = null,
                 endZoneOffset = null,
-                stages = listOf(SleepSessionRecord.Stage(Instant.ofEpochMilli(startTime), Instant.ofEpochMilli(endTime), SleepSessionRecord.STAGE_TYPE_AWAKE)),
+                stages = listOf(
+                    SleepSessionRecord.Stage(
+                        Instant.ofEpochMilli(startTime),
+                        Instant.ofEpochMilli(endTime),
+                        SleepSessionRecord.STAGE_TYPE_AWAKE
+                    )
+                ),
             )
+
             SLEEP_SESSION -> SleepSessionRecord(
                 startTime = Instant.ofEpochMilli(startTime),
                 endTime = Instant.ofEpochMilli(endTime),
@@ -1067,12 +982,12 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         val endTime = Instant.ofEpochMilli(call.argument<Long>("endTime")!!)
         val totalEnergyBurned = call.argument<Int>("totalEnergyBurned")
         val totalDistance = call.argument<Int>("totalDistance")
-        if(workoutTypeMapHealthConnect.containsKey(type) == false) {
+        if (WorkoutType.map.containsKey(type) == false) {
             result.success(false)
             Log.w("FLUTTER_HEALTH::ERROR", "[Health Connect] Workout type not supported")
             return
         }
-        val workoutType = workoutTypeMapHealthConnect[type]!!
+        val workoutType = WorkoutType.map[type]!!
 
         scope.launch {
             try {
@@ -1165,7 +1080,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         val type = call.argument<String>("dataTypeKey")!!
         val startTime = Instant.ofEpochMilli(call.argument<Long>("startTime")!!)
         val endTime = Instant.ofEpochMilli(call.argument<Long>("endTime")!!)
-        if(!MapToHCType.containsKey(type)) {
+        if (!MapToHCType.containsKey(type)) {
             Log.w("FLUTTER_HEALTH::ERROR", "Datatype " + type + " not found in HC")
             result.success(false)
             return
@@ -1184,97 +1099,4 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
             }
         }
     }
-
-    val MapSleepStageToType = hashMapOf<Int, String>(
-        1 to SLEEP_AWAKE,
-        2 to SLEEP_ASLEEP,
-        3 to SLEEP_OUT_OF_BED,
-        4 to SLEEP_LIGHT,
-        5 to SLEEP_DEEP,
-        6 to SLEEP_REM,
-    )
-
-    private val MapMealTypeToTypeHC = hashMapOf<String, Int>(
-        BREAKFAST to MEAL_TYPE_BREAKFAST,
-        LUNCH to MEAL_TYPE_LUNCH,
-        DINNER to MEAL_TYPE_DINNER,
-        SNACK to MEAL_TYPE_SNACK,
-        MEAL_UNKNOWN to MEAL_TYPE_UNKNOWN,
-    )
-
-    private val MapTypeToMealTypeHC = hashMapOf<Int, String>(
-        MEAL_TYPE_BREAKFAST to BREAKFAST,
-        MEAL_TYPE_LUNCH to LUNCH,
-        MEAL_TYPE_DINNER to DINNER,
-        MEAL_TYPE_SNACK to SNACK,
-        MEAL_TYPE_UNKNOWN to MEAL_UNKNOWN,
-    )
-
-    val MapToHCType = hashMapOf(
-        BODY_FAT_PERCENTAGE to BodyFatRecord::class,
-        HEIGHT to HeightRecord::class,
-        WEIGHT to WeightRecord::class,
-        STEPS to StepsRecord::class,
-        AGGREGATE_STEP_COUNT to StepsRecord::class,
-        ACTIVE_ENERGY_BURNED to ActiveCaloriesBurnedRecord::class,
-        HEART_RATE to HeartRateRecord::class,
-        BODY_TEMPERATURE to BodyTemperatureRecord::class,
-        BLOOD_PRESSURE_SYSTOLIC to BloodPressureRecord::class,
-        BLOOD_PRESSURE_DIASTOLIC to BloodPressureRecord::class,
-        BLOOD_OXYGEN to OxygenSaturationRecord::class,
-        BLOOD_GLUCOSE to BloodGlucoseRecord::class,
-        DISTANCE_DELTA to DistanceRecord::class,
-        WATER to HydrationRecord::class,
-        SLEEP_ASLEEP to SleepSessionRecord::class,
-        SLEEP_AWAKE to SleepSessionRecord::class,
-        SLEEP_LIGHT to SleepSessionRecord::class,
-        SLEEP_DEEP to SleepSessionRecord::class,
-        SLEEP_REM to SleepSessionRecord::class,
-        SLEEP_OUT_OF_BED to SleepSessionRecord::class,
-        SLEEP_SESSION to SleepSessionRecord::class,
-        WORKOUT to ExerciseSessionRecord::class,
-        NUTRITION to NutritionRecord::class,
-        RESTING_HEART_RATE to RestingHeartRateRecord::class,
-        BASAL_ENERGY_BURNED to BasalMetabolicRateRecord::class,
-        FLIGHTS_CLIMBED to FloorsClimbedRecord::class,
-        RESPIRATORY_RATE to RespiratoryRateRecord::class,
-        // MOVE_MINUTES to TODO: Find alternative?
-        // TODO: Implement remaining types
-        // "ActiveCaloriesBurned" to ActiveCaloriesBurnedRecord::class,
-        // "BasalBodyTemperature" to BasalBodyTemperatureRecord::class,
-        // "BasalMetabolicRate" to BasalMetabolicRateRecord::class,
-        // "BloodGlucose" to BloodGlucoseRecord::class,
-        // "BloodPressure" to BloodPressureRecord::class,
-        // "BodyFat" to BodyFatRecord::class,
-        // "BodyTemperature" to BodyTemperatureRecord::class,
-        // "BoneMass" to BoneMassRecord::class,
-        // "CervicalMucus" to CervicalMucusRecord::class,
-        // "CyclingPedalingCadence" to CyclingPedalingCadenceRecord::class,
-        // "Distance" to DistanceRecord::class,
-        // "ElevationGained" to ElevationGainedRecord::class,
-        // "ExerciseSession" to ExerciseSessionRecord::class,
-        // "FloorsClimbed" to FloorsClimbedRecord::class,
-        // "HeartRate" to HeartRateRecord::class,
-        // "Height" to HeightRecord::class,
-        // "Hydration" to HydrationRecord::class,
-        // "LeanBodyMass" to LeanBodyMassRecord::class,
-        // "MenstruationFlow" to MenstruationFlowRecord::class,
-        // "MenstruationPeriod" to MenstruationPeriodRecord::class,
-        // "Nutrition" to NutritionRecord::class,
-        // "OvulationTest" to OvulationTestRecord::class,
-        // "OxygenSaturation" to OxygenSaturationRecord::class,
-        // "Power" to PowerRecord::class,
-        // "RespiratoryRate" to RespiratoryRateRecord::class,
-        // "RestingHeartRate" to RestingHeartRateRecord::class,
-        // "SexualActivity" to SexualActivityRecord::class,
-        // "SleepSession" to SleepSessionRecord::class,
-        // "SleepStage" to SleepStageRecord::class,
-        // "Speed" to SpeedRecord::class,
-        // "StepsCadence" to StepsCadenceRecord::class,
-        // "Steps" to StepsRecord::class,
-        // "TotalCaloriesBurned" to TotalCaloriesBurnedRecord::class,
-        // "Vo2Max" to Vo2MaxRecord::class,
-        // "Weight" to WeightRecord::class,
-        // "WheelchairPushes" to WheelchairPushesRecord::class,
-    )
 }
