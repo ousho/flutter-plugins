@@ -53,6 +53,7 @@ android {
     lint {
         disable 'InvalidPackage'
     }
+    namespace 'cachet.plugins.example_app'
 }
 
 flutter {
