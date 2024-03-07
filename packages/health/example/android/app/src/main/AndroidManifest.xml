@@ -95,4 +95,9 @@
         <meta-data android:name="flutterEmbedding"
             android:value="2"/>
     </application>
+
+    <!-- Check if Health Connect is installed -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 </manifest>
