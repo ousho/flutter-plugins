@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 class HCPermissionObserver(
     private val registry: ActivityResultRegistry,
     private val permissions: Set<String>,
-    private val result: MethodChannel.Result,
+    private val onPermissionsLaunch: (Set<String>) -> Unit = {},
 ): DefaultLifecycleObserver {
     private lateinit var getPermissions : ActivityResultLauncher<Set<String>>
 
@@ -20,11 +20,7 @@ class HCPermissionObserver(
         val contract = PermissionController.createRequestPermissionResultContract()
         getPermissions = registry.register("RequestPermission", owner, contract) { granted ->
             // 権限取得後の処理
-            if (granted.containsAll(permissions)) {
-                result.success(true)
-            } else {
-                result.error("Not granted", null, null)
-            }
+            onPermissionsLaunch(granted)
         }
     }
 

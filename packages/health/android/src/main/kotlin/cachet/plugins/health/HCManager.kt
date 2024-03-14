@@ -24,11 +24,7 @@ class HCManager(private val context: Context) {
         return availability
     }
 
-    suspend fun hasAllPermissions(permissions: Set<String>): Boolean {
+    suspend fun hasPermissions(permissions: Set<String>): Boolean {
         return healthConnectClient.permissionController.getGrantedPermissions().containsAll(permissions)
-    }
-
-    fun requestPermissions(permissions: List<String>, result: MethodChannel.Result) {
-
     }
 }

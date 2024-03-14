@@ -1,5 +1,6 @@
 package cachet.plugins.health
 
+import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BasalMetabolicRateRecord
 import androidx.health.connect.client.records.BloodGlucoseRecord
@@ -19,28 +20,32 @@ import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 
 object HCType {
     const val BODY_FAT_PERCENTAGE = "BODY_FAT_PERCENTAGE"
     const val HEIGHT = "HEIGHT"
     const val WEIGHT = "WEIGHT"
+    const val LEAN_BODY_MASS = "LEAN_BODY_MASS"                         // 除脂肪体重
     const val STEPS = "STEPS"
     const val AGGREGATE_STEP_COUNT = "AGGREGATE_STEP_COUNT"
-    const val ACTIVE_ENERGY_BURNED = "ACTIVE_ENERGY_BURNED"
+    const val ACTIVE_ENERGY_BURNED = "ACTIVE_ENERGY_BURNED"             // 運動時消費カロリー
+    const val BASAL_ENERGY_BURNED = "BASAL_ENERGY_BURNED"               // 安静時消費カロリー
     const val HEART_RATE = "HEART_RATE"
     const val BODY_TEMPERATURE = "BODY_TEMPERATURE"
     const val BLOOD_PRESSURE_SYSTOLIC = "BLOOD_PRESSURE_SYSTOLIC"
     const val BLOOD_PRESSURE_DIASTOLIC = "BLOOD_PRESSURE_DIASTOLIC"
     const val BLOOD_OXYGEN = "BLOOD_OXYGEN"
     const val BLOOD_GLUCOSE = "BLOOD_GLUCOSE"
-    const val MOVE_MINUTES = "MOVE_MINUTES"
     const val DISTANCE_DELTA = "DISTANCE_DELTA"
     const val WATER = "WATER"
     const val RESTING_HEART_RATE = "RESTING_HEART_RATE"
-    const val BASAL_ENERGY_BURNED = "BASAL_ENERGY_BURNED"
-    const val FLIGHTS_CLIMBED = "FLIGHTS_CLIMBED"
+    const val ELEVATION_GAINED = "ELEVATION_GAINED"                     // 獲得標高
+    const val FLIGHTS_CLIMBED = "FLIGHTS_CLIMBED"                       // 登った回数
     const val RESPIRATORY_RATE = "RESPIRATORY_RATE"
+    const val TOTAL_ENERGY_BURNED = "TOTAL_ENERGY"
+    const val DISTANCE = "DISTANCE"
 
     // TODO support unknown?
     const val SLEEP_ASLEEP = "SLEEP_ASLEEP"
@@ -58,6 +63,15 @@ object HCType {
     const val DINNER = "DINNER"
     const val SNACK = "SNACK"
     const val MEAL_UNKNOWN = "UNKNOWN"
+
+    val activityReadTypes: Set<String> = setOf(
+        r(ACTIVE_ENERGY_BURNED),
+        r(BASAL_ENERGY_BURNED),
+        r(DISTANCE),
+        r(FLIGHTS_CLIMBED),
+        r(STEPS),
+        r(TOTAL_ENERGY_BURNED),
+    )
 
     val MapSleepStageToType = hashMapOf<Int, String>(
         1 to SLEEP_AWAKE,
@@ -110,45 +124,19 @@ object HCType {
         NUTRITION to NutritionRecord::class,
         RESTING_HEART_RATE to RestingHeartRateRecord::class,
         BASAL_ENERGY_BURNED to BasalMetabolicRateRecord::class,
+        TOTAL_ENERGY_BURNED to TotalCaloriesBurnedRecord::class,
+        DISTANCE to DistanceRecord::class,
         FLIGHTS_CLIMBED to FloorsClimbedRecord::class,
         RESPIRATORY_RATE to RespiratoryRateRecord::class,
-        // MOVE_MINUTES to TODO: Find alternative?
-        // TODO: Implement remaining types
-        // "ActiveCaloriesBurned" to ActiveCaloriesBurnedRecord::class,
-        // "BasalBodyTemperature" to BasalBodyTemperatureRecord::class,
-        // "BasalMetabolicRate" to BasalMetabolicRateRecord::class,
-        // "BloodGlucose" to BloodGlucoseRecord::class,
-        // "BloodPressure" to BloodPressureRecord::class,
-        // "BodyFat" to BodyFatRecord::class,
-        // "BodyTemperature" to BodyTemperatureRecord::class,
-        // "BoneMass" to BoneMassRecord::class,
-        // "CervicalMucus" to CervicalMucusRecord::class,
-        // "CyclingPedalingCadence" to CyclingPedalingCadenceRecord::class,
-        // "Distance" to DistanceRecord::class,
-        // "ElevationGained" to ElevationGainedRecord::class,
-        // "ExerciseSession" to ExerciseSessionRecord::class,
-        // "FloorsClimbed" to FloorsClimbedRecord::class,
-        // "HeartRate" to HeartRateRecord::class,
-        // "Height" to HeightRecord::class,
-        // "Hydration" to HydrationRecord::class,
-        // "LeanBodyMass" to LeanBodyMassRecord::class,
-        // "MenstruationFlow" to MenstruationFlowRecord::class,
-        // "MenstruationPeriod" to MenstruationPeriodRecord::class,
-        // "Nutrition" to NutritionRecord::class,
-        // "OvulationTest" to OvulationTestRecord::class,
-        // "OxygenSaturation" to OxygenSaturationRecord::class,
-        // "Power" to PowerRecord::class,
-        // "RespiratoryRate" to RespiratoryRateRecord::class,
-        // "RestingHeartRate" to RestingHeartRateRecord::class,
-        // "SexualActivity" to SexualActivityRecord::class,
-        // "SleepSession" to SleepSessionRecord::class,
-        // "SleepStage" to SleepStageRecord::class,
-        // "Speed" to SpeedRecord::class,
-        // "StepsCadence" to StepsCadenceRecord::class,
-        // "Steps" to StepsRecord::class,
-        // "TotalCaloriesBurned" to TotalCaloriesBurnedRecord::class,
-        // "Vo2Max" to Vo2MaxRecord::class,
-        // "Weight" to WeightRecord::class,
-        // "WheelchairPushes" to WheelchairPushesRecord::class,
     )
+
+    private fun r(dataType: String): String {
+        val hcType = this.MapToHCType[dataType]
+        return HealthPermission.getReadPermission(hcType!!)
+    }
+
+    private fun w(dataType: String): String {
+        val hcType = this.MapToHCType[dataType]
+        return HealthPermission.getWritePermission(hcType!!)
+    }
 }

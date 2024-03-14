@@ -82,9 +82,8 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
     private var activity: Activity? = null
     private var context: Context? = null
     private var threadPoolExecutor: ExecutorService? = null
-    private var useHealthConnectIfAvailable: Boolean = false
-    private var healthConnectRequestPermissionsLauncher: ActivityResultLauncher<Set<String>>? = null
-    private lateinit var healthConnectClient: HealthConnectClient
+    private var useHealthConnectIfAvailable: Boolean = true
+    private lateinit var hcManager: HCManager
     private lateinit var scope: CoroutineScope
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -95,8 +94,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         threadPoolExecutor = Executors.newFixedThreadPool(4)
         checkAvailability()
         if (healthConnectAvailable) {
-            healthConnectClient =
-                HealthConnectClient.getOrCreate(flutterPluginBinding.applicationContext)
+            hcManager = HCManager(flutterPluginBinding.applicationContext)
         }
     }
 
@@ -271,12 +269,11 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
             val requestPermissionActivityContract =
                 PermissionController.createRequestPermissionResultContract()
 
-            healthConnectRequestPermissionsLauncher =
-                (activity as ComponentActivity).registerForActivityResult(
-                    requestPermissionActivityContract
-                ) { granted ->
-                    onHealthConnectPermissionCallback(granted)
-                }
+            val componentActivity = activity as ComponentActivity
+            val permissionObserver = HCPermissionObserver(componentActivity.activityResultRegistry, HCType.activityReadTypes) { granted ->
+                // TODO: 権限取得後の処理
+                onHealthConnectPermissionCallback(granted)
+            }
         }
 
     }
